@@ -4,12 +4,13 @@ API de fichas de investigador do Call of Cthulhu (7ª edição), em Go, só com 
 
 ## Rotas
 
-Todas com `Access-Control-Allow-Origin: *`.
+Todas com `Access-Control-Allow-Origin: *`. As listas são guardadas em cache por um dia (`Cache-Control: public, max-age=86400`); fichas e health nunca (`no-store`).
 
 | Rota | O que dá |
 |---|---|
-| `GET /char-generator/health` | `{"status":"UP"}`, sem gerar ficha |
-| `GET /char-generator/random-char` | Uma ficha. Opcionais: `stereotype`, `nativeLanguageRegion`, `foreignLanguageRegion` |
+| `GET /char-generator/health` | `{"status":"UP","version":"<commit>"}`, sem gerar ficha |
+| `GET /char-generator/random-char` | Uma ficha. Opcionais: `stereotype`, `nativeLanguageRegion`, `foreignLanguageRegion` e `seed` (a mesma semente dá a mesma ficha) |
+| `GET /char-generator/random-chars?n=10` | De 1 a 30 fichas numa chamada, com as mesmas opções (`n` fora disso dá 400) |
 | `GET /char-generator/random-char/stereotype` | Os 20 estereótipos |
 | `GET /char-generator/random-char/region/native` | As regiões, com as línguas nativas |
 | `GET /char-generator/random-char/region/foreign` | As regiões, com as línguas estrangeiras |
