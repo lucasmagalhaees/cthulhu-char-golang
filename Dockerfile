@@ -4,7 +4,7 @@ WORKDIR /src
 COPY go.mod ./
 COPY . .
 ARG VERCEL_GIT_COMMIT_SHA=""
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$(echo \"$VERCEL_GIT_COMMIT_SHA\" | cut -c1-7)" -o /api .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$(printf %.7s "$VERCEL_GIT_COMMIT_SHA")" -o /api .
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /api /api
