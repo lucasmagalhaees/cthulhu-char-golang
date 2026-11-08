@@ -299,3 +299,67 @@ func TestUnknownRoutesAre404AndTheRootGoesToHealth(t *testing.T) {
 		t.Fatalf("root %d %s", res.StatusCode, res.Header.Get("Location"))
 	}
 }
+
+// ---- batch, seed, version and cache (written before the code) ----
+
+func TestBatchGivesNSheetsFromTheAskedRegion(t *testing.T) {
+	var rs []record
+	getJSON(t, "/char-generator/random-chars?n=10&nativeLanguageRegion=ASIA", &rs)
+	if len(rs) != 10 {
+		t.Fatalf("got %d sheets", len(rs))
+	}
+	for _, r := range rs {
+		if !slices.Contains([]string{"Japanese", "Thai", "Korean", "Mandarin"}, r.NativeLanguage.Detail) {
+			t.Fatalf("native %q not from Asia", r.NativeLanguage.Detail)
+		}
+	}
+}
+
+func TestBatchRejectsABadCount(t *testing.T) {
+	for _, n := range []string{"0", "31", "x", "-2"} {
+		res, err := http.Get(srv.URL + "/char-generator/random-chars?n=" + n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 400 {
+			t.Fatalf("n=%s: status %d", n, res.StatusCode)
+		}
+	}
+}
+
+func TestTheSameSeedGivesTheSameSheet(t *testing.T) {
+	a, b := sheetOf(t, "?seed=42"), sheetOf(t, "?seed=42")
+	if a.Age != b.Age || !slices.Equal(a.CharFirst, b.CharFirst) || a.NativeLanguage != b.NativeLanguage {
+		t.Fatal("seed 42 gave two different sheets")
+	}
+	var x, y []record
+	getJSON(t, "/char-generator/random-chars?n=3&seed=7", &x)
+	getJSON(t, "/char-generator/random-chars?n=3&seed=7", &y)
+	if x[0].Age != y[0].Age || x[2].Age != y[2].Age || slices.Equal(x[0].CharFirst, x[1].CharFirst) && x[0].Age == x[1].Age {
+		t.Fatal("a seeded batch is not reproducible, or repeats one sheet")
+	}
+}
+
+func TestHealthSaysTheVersion(t *testing.T) {
+	var h map[string]string
+	getJSON(t, "/char-generator/health", &h)
+	if h["status"] != "UP" || h["version"] == "" {
+		t.Fatalf("%v", h)
+	}
+}
+
+func TestListsAreCachedAndSheetsAreNot(t *testing.T) {
+	for path, want := range map[string]string{
+		"/char-generator/random-char/stereotype":    "public, max-age=86400",
+		"/char-generator/random-char/region/native": "public, max-age=86400",
+		"/char-generator/random-char":               "no-store",
+		"/char-generator/random-chars?n=2":          "no-store",
+		"/char-generator/health":                    "no-store",
+	} {
+		var v any
+		if got := getJSON(t, path, &v).Header.Get("Cache-Control"); got != want {
+			t.Errorf("%s: Cache-Control %q, want %q", path, got, want)
+		}
+	}
+}
